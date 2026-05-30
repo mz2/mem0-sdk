@@ -31,13 +31,13 @@ jobs:
   # deep) and set XDG_RUNTIME_DIR (no login session → no /run/user/<uid>).
   build-arm64:
     runs-on: [self-hosted, arm64]
-    env:
-      XDG_RUNTIME_DIR: ${{ runner.temp }}/xdg
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
       - name: Prepare runtime dir
-        run: mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
+        run: |
+          mkdir -p "$RUNNER_TEMP/xdg" && chmod 700 "$RUNNER_TEMP/xdg"
+          echo "XDG_RUNTIME_DIR=$RUNNER_TEMP/xdg" >> "$GITHUB_ENV"
       - name: Pack SDK for arm64
         run: sdkcraft --verbose pack --destructive-mode --build-for arm64
