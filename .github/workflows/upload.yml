@@ -64,10 +64,20 @@ jobs:
   # No per-run sudo. sdkcraft pack runs in managed mode (LXD).
   publish-arm64:
     runs-on: [self-hosted, arm64]
+    # The arm64 runner is itself an LXD container, so managed-mode pack would
+    # double-nest LXD — and snapd can't load its apparmor profile two levels
+    # deep. Build destructively in the (already isolated) runner instead. The
+    # runner runs without a login session, so point XDG_RUNTIME_DIR at a
+    # writable dir or sdkcraft's state step fails trying to mkdir /run/user/<uid>.
+    env:
+      XDG_RUNTIME_DIR: ${{ runner.temp }}/xdg
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+
+      - name: Prepare runtime dir
+        run: mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
 
       - name: Define track name
         run: |
@@ -77,7 +87,7 @@ jobs:
           INPUT_BRANCH: ${{ inputs.branch }}
 
       - name: Pack SDK for arm64
-        run: sdkcraft --verbose pack --build-for arm64
+        run: sdkcraft --verbose pack --destructive-mode --build-for arm64
 
       - name: Upload arm64 SDK
         env:
