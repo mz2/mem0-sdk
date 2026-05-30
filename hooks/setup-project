@@ -1,0 +1,65 @@
+#!/usr/bin/bash
+# Runs as the workshop user after interfaces are connected. Builds the persisted
+# venv (mem0ai + server deps), seeds the default config and .env, installs the
+# REST server systemd unit, and starts it only when MEM0_SERVE is enabled.
+set -euo pipefail
+
+VERSION="$(cat "$SDK/VERSION")"
+VENV="/home/workshop/.local/share/mem0/venv"
+MEM0_DIR="/home/workshop/.mem0"
+
+mkdir -p "$MEM0_DIR" /home/workshop/.cache/pip
+
+# --- Persisted virtual environment --------------------------------------------
+if [ ! -x "$VENV/bin/python" ]; then
+    python3 -m venv "$VENV"
+    "$VENV/bin/pip" install --upgrade pip
+fi
+# Pin mem0ai to the SDK version; fastapi/uvicorn/dotenv back the REST server.
+"$VENV/bin/pip" install \
+    "mem0ai==${VERSION}" \
+    "fastapi" \
+    "uvicorn" \
+    "python-dotenv"
+
+# --- REST server module --------------------------------------------------------
+# Copy the vendored server out of $SDK (a root-owned 711 dir Python's import
+# machinery cannot list) into a workshop-owned, readable location for uvicorn.
+install -D -m644 "$SDK/mem0_server.py" "$VENV/../server/mem0_server.py"
+
+# --- Default config (idempotent) ---------------------------------------------
+if [ ! -f "$MEM0_DIR/mem0_config.json" ]; then
+    cp "$SDK/mem0_config.default.json" "$MEM0_DIR/mem0_config.json"
+fi
+
+# --- Secrets / toggles (idempotent) ------------------------------------------
+if [ ! -f "$MEM0_DIR/.env" ]; then
+    cat <<'EOF' > "$MEM0_DIR/.env"
+# mem0 SDK environment. Edit, then for the REST server:
+#   systemctl --user restart mem0-server
+#
+# Backend credentials (default backend is OpenAI):
+# OPENAI_API_KEY=sk-...
+#
+# Set to 1 to run the REST API server (exposed on the mem0-api tunnel, :8000).
+# Leave 0/unset for in-process library use only.
+MEM0_SERVE=0
+EOF
+    chmod 600 "$MEM0_DIR/.env"
+fi
+
+# --- REST server systemd user unit -------------------------------------------
+install -D --mode=644 "$SDK/mem0-server.service" \
+    ~/.config/systemd/user/mem0-server.service
+systemctl --user daemon-reload
+
+set +u
+# shellcheck disable=SC1091
+[ -f "$MEM0_DIR/.env" ] && . "$MEM0_DIR/.env"
+set -u
+case "${MEM0_SERVE:-0}" in
+    1|true|TRUE|yes|on)
+        systemctl --user enable --now mem0-server ;;
+    *)
+        systemctl --user disable --now mem0-server 2>/dev/null || true ;;
+esac

@@ -1,0 +1,27 @@
+#!/usr/bin/bash
+# Reports SDK health. The library must import; if the REST server is enabled
+# (MEM0_SERVE), its /health endpoint must answer too.
+set -uo pipefail
+
+# 1. In-process library must import from the persisted venv.
+if ! out=$(sudo -u workshop --login python -c "import mem0; print(mem0.__version__)" 2>&1); then
+    workshopctl set-health error "mem0 library not importable: ${out}"
+    exit 0
+fi
+
+# 2. REST server: only checked when the user enabled it.
+serve="$(sudo -u workshop --login bash -lc 'set -a; [ -f "$MEM0_DIR/.env" ] && . "$MEM0_DIR/.env"; echo "${MEM0_SERVE:-0}"')"
+case "$serve" in
+    1|true|TRUE|yes|on)
+        if ! curl -fsS --max-time 5 http://127.0.0.1:8000/health >/dev/null 2>&1; then
+            workshopctl set-health waiting "mem0 library ${out} ok; REST server starting on :8000"
+            exit 0
+        fi
+        echo -n "mem0 ${out} — library ready; REST API on the mem0-api tunnel (:8000)"
+        ;;
+    *)
+        echo -n "mem0 ${out} — in-process library ready (set MEM0_SERVE=1 in ~/.mem0/.env for the REST server)"
+        ;;
+esac
+
+workshopctl set-health okay

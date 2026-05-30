@@ -1,0 +1,17 @@
+#!/usr/bin/bash
+# Runs as root on launch and refresh. System-wide setup: install the Python
+# tooling needed to build the persisted venv, and expose the venv + SDK paths
+# and mem0 environment to every login shell (including the systemd user unit,
+# which starts via `bash -lc`).
+set -euo pipefail
+
+apt-get update
+eatmydata apt-get install python3-venv python3-pip
+
+cat <<EOF >/etc/profile.d/mem0.sh
+# mem0 SDK environment
+export MEM0_SDK_DIR="${SDK}"
+export MEM0_DIR="/home/workshop/.mem0"
+export MEM0_CONFIG_PATH="/home/workshop/.mem0/mem0_config.json"
+export PATH="/home/workshop/.local/share/mem0/venv/bin:\$PATH"
+EOF

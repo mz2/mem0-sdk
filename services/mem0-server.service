@@ -1,0 +1,16 @@
+[Unit]
+Description=mem0 REST API server (embedded)
+After=network.target
+
+[Service]
+# Run the vendored upstream mem0 server with uvicorn from the persisted venv.
+# The login shell sources /etc/profile.d/mem0.sh, putting the venv on PATH and
+# exporting MEM0_DIR / MEM0_CONFIG_PATH. Secrets such as OPENAI_API_KEY are read
+# from ~/.mem0/.env if present.
+EnvironmentFile=-/home/workshop/.mem0/.env
+ExecStart=/bin/bash -lc 'exec uvicorn mem0_server:app --host 0.0.0.0 --port 8000 --app-dir /home/workshop/.local/share/mem0/server'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

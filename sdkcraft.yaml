@@ -1,0 +1,97 @@
+name: mem0
+adopt-info: mem0
+build-base: ubuntu@24.04
+summary: The memory layer for AI agents and applications
+description: |
+  This SDK provides mem0, the memory layer for AI agents, inside a workshop in
+  two interchangeable forms that share one local store:
+
+  - In-process library — the upstream mem0ai package installed into a persisted
+    virtual environment, so you can `import mem0` and use `Memory()` directly.
+  - REST API server — the upstream mem0 self-hosted server (vendored from
+    v0.1.114), run fully embedded and exposed on a tunnel for other workshops
+    (e.g. a Hermes agent) to consume over HTTP.
+
+  Both run mem0 entirely locally: memory orchestration, the SQLite history
+  database, and the embedded Qdrant vector store all live under ~/.mem0, which
+  is persisted on the host across workshop updates along with the virtual
+  environment. By default mem0 uses an OpenAI-backed LLM and embedder (set
+  OPENAI_API_KEY in ~/.mem0/.env); edit ~/.mem0/mem0_config.json to point it at
+  a local Ollama for fully offline use. The REST server is off by default —
+  enable it with `MEM0_SERVE=1` in ~/.mem0/.env.
+license: Apache-2.0
+# Every part is nil/dump (no arch-specific build work — the mem0ai install
+# happens at runtime in hooks), so any runner can cross-pack any platform.
+platforms:
+  amd64:
+    build-on: [amd64, arm64]
+    build-for: [amd64]
+  arm64:
+    build-on: [amd64, arm64]
+    build-for: [arm64]
+
+plugs:
+  # GPU access for a local in-process embedding/LLM backend (e.g. Ollama).
+  # Ignored when mem0 is backed by a hosted API such as OpenAI.
+  gpu:
+    interface: gpu
+
+  # Persisted mem0 working directory: history.db (SQLite), the embedded
+  # on-disk Qdrant vector store, mem0_config.json, and .env (secrets).
+  mem0-data:
+    interface: mount
+    workshop-target: /home/workshop/.mem0
+    mode: 0o700
+
+  # Persisted virtual environment holding the mem0ai install plus the server
+  # deps, so the (slow) install only happens once and survives updates.
+  mem0-venv:
+    interface: mount
+    workshop-target: /home/workshop/.local/share/mem0
+
+  # Persisted pip download cache to speed up reinstalls.
+  pip-cache:
+    interface: mount
+    workshop-target: /home/workshop/.cache/pip
+
+slots:
+  # The mem0 REST API server (when MEM0_SERVE=1). Reach it from the host or a
+  # peer workshop over a tunnel, e.g. a Hermes agent's mem0 memory provider.
+  mem0-api:
+    interface: tunnel
+    endpoint: 8000
+
+parts:
+  # Version-only part: drives `adopt-info` from VERSION and ships VERSION into
+  # the SDK payload (read at runtime by the hooks to pin the mem0ai install).
+  mem0:
+    plugin: nil
+    override-pull: |
+      VERSION=$(cat "$CRAFT_PROJECT_DIR/VERSION")
+      craftctl set version="$VERSION"
+    override-build: |
+      install -D -m644 "$CRAFT_PROJECT_DIR/VERSION" "$CRAFT_PART_INSTALL/VERSION"
+
+  # Vendored upstream mem0 REST server (FastAPI). See server/SOURCE.md for
+  # provenance — endpoints are upstream verbatim; only the config block is the
+  # SDK's embedded delta. Lands at $SDK/mem0_server.py.
+  server:
+    plugin: dump
+    source: server
+    source-type: local
+    stage:
+      - mem0_server.py
+
+  # Default declarative mem0 config (embedded Qdrant on-disk + SQLite under
+  # ~/.mem0). Only documented mem0 config keys; no code. Lands at
+  # $SDK/mem0_config.default.json.
+  config:
+    plugin: dump
+    source: config
+    source-type: local
+
+  # systemd user unit for the REST server. Lands at $SDK/mem0-server.service.
+  services:
+    plugin: dump
+    source: services
+    source-type: local

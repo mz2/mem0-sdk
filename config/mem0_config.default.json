@@ -1,0 +1,24 @@
+{
+  "vector_store": {
+    "provider": "qdrant",
+    "config": {
+      "collection_name": "mem0",
+      "path": "/home/workshop/.mem0/qdrant",
+      "on_disk": true
+    }
+  },
+  "llm": {
+    "provider": "openai",
+    "config": {
+      "model": "gpt-4o-mini",
+      "temperature": 0.2
+    }
+  },
+  "embedder": {
+    "provider": "openai",
+    "config": {
+      "model": "text-embedding-3-small"
+    }
+  },
+  "history_db_path": "/home/workshop/.mem0/history.db"
+}

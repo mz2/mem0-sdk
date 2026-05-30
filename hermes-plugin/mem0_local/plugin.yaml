@@ -1,0 +1,6 @@
+name: mem0-local
+version: 1.0.0
+description: "mem0 memory backed by a self-hosted mem0 REST server (no cloud, no API key)."
+# No pip dependencies — the provider talks to the mem0 server over plain HTTP
+# using only the Python standard library.
+pip_dependencies: []
