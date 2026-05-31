@@ -9,7 +9,16 @@ if ! out=$(sudo -u workshop --login python -c "import mem0; print(mem0.__version
     exit 0
 fi
 
-# 2. REST server: only checked when the user enabled it.
+# 2. Config must be usable — fail loudly (error) rather than report healthy
+#    while silently misconfigured: no model set, a cloud provider with no API
+#    key, or an ollama embedder with no embedding_model_dims.
+problem="$(sudo -u workshop --login python "$SDK/mem0_healthcheck.py" 2>/dev/null)"
+if [ -n "$problem" ]; then
+    workshopctl set-health error "mem0 not usable: ${problem}. Edit ~/.mem0/mem0_config.json (and ~/.mem0/.env), then run: workshop refresh"
+    exit 0
+fi
+
+# 3. REST server: only checked when the user enabled it.
 serve="$(sudo -u workshop --login bash -lc 'set -a; [ -f "$MEM0_DIR/.env" ] && . "$MEM0_DIR/.env"; echo "${MEM0_SERVE:-0}"')"
 case "$serve" in
     1|true|TRUE|yes|on)

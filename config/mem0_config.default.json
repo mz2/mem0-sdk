@@ -8,16 +8,19 @@
     }
   },
   "llm": {
-    "provider": "openai",
+    "provider": "ollama",
     "config": {
-      "model": "gpt-4o-mini",
-      "temperature": 0.2
+      "model": "",
+      "temperature": 0.2,
+      "ollama_base_url": "http://127.0.0.1:11434"
     }
   },
   "embedder": {
-    "provider": "openai",
+    "provider": "ollama",
     "config": {
-      "model": "text-embedding-3-small"
+      "model": "",
+      "embedding_model_dims": null,
+      "ollama_base_url": "http://127.0.0.1:11434"
     }
   },
   "history_db_path": "/home/workshop/.mem0/history.db"
