@@ -10,9 +10,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # amd64 — GitHub-hosted, fresh LXD + sdkcraft per run.
-  build-amd64:
-    runs-on: ubuntu-latest
+  # GitHub-hosted runners (amd64 + arm64; arm64 hosted runners are free for
+  # public repos). Fresh LXD + sdkcraft per run, managed-mode pack.
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runs-on: ubuntu-latest
+          - arch: arm64
+            runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -23,21 +32,5 @@ jobs:
           channel: 6/stable
       - name: Install sdkcraft
         run: sudo snap install sdkcraft --classic
-      - name: Pack SDK for amd64
-        run: sdkcraft --verbose pack --build-for amd64
-
-  # arm64 — self-hosted ozymandias. The runner is an LXD container, so we pack
-  # destructively (no double-nested LXD; snapd can't load apparmor two levels
-  # deep) and set XDG_RUNTIME_DIR (no login session → no /run/user/<uid>).
-  build-arm64:
-    runs-on: [self-hosted, arm64]
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-      - name: Prepare runtime dir
-        run: |
-          mkdir -p "$RUNNER_TEMP/xdg" && chmod 700 "$RUNNER_TEMP/xdg"
-          echo "XDG_RUNTIME_DIR=$RUNNER_TEMP/xdg" >> "$GITHUB_ENV"
-      - name: Pack SDK for arm64
-        run: sdkcraft --verbose pack --destructive-mode --build-for arm64
+      - name: Pack SDK for ${{ matrix.arch }}
+        run: sdkcraft --verbose pack --build-for ${{ matrix.arch }}

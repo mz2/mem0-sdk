@@ -16,11 +16,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # amd64 — GitHub-hosted ubuntu-latest. Has passwordless sudo, so we can
-  # install LXD and sdkcraft per-run. Free for public repos; counts against
-  # Actions minutes on private repos.
-  publish-amd64:
-    runs-on: ubuntu-latest
+  # GitHub-hosted runners (amd64 + arm64; arm64 hosted runners are free for
+  # public repos, billed as larger runners on private repos). Each runner has
+  # passwordless sudo, so we install LXD + sdkcraft per run and pack in managed
+  # mode — a single LXD nesting level, so snapd/apparmor work normally.
+  publish:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runs-on: ubuntu-latest
+          - arch: arm64
+            runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -41,55 +50,10 @@ jobs:
         env:
           INPUT_BRANCH: ${{ inputs.branch }}
 
-      - name: Pack SDK for amd64
-        run: sdkcraft --verbose pack --build-for amd64
+      - name: Pack SDK for ${{ matrix.arch }}
+        run: sdkcraft --verbose pack --build-for ${{ matrix.arch }}
 
-      - name: Upload amd64 SDK
-        env:
-          SDKCRAFT_STORE_CREDENTIALS: ${{ secrets.SDKCRAFT_STORE_CREDENTIALS }}
-        run: |
-          for sdk in *.sdk; do
-            sdkcraft --verbose upload "$sdk" --release "${TRACK}/stable"
-          done
-
-  # arm64 — self-hosted ozymandias runner. The runner user (`runner`) needs
-  # one-time host setup (run once by operator with sudo):
-  #
-  #   sudo snap install sdkcraft --classic          # already done
-  #   sudo snap install lxd --channel=6/stable      # if not already
-  #   sudo usermod -aG lxd runner                   # for sdkcraft pack →
-  #                                                 # /var/snap/lxd/common/lxd/unix.socket
-  #   # then restart the runner so the new group is in effect
-  #
-  # No per-run sudo. sdkcraft pack runs in managed mode (LXD).
-  # The arm64 runner is itself an LXD container, so managed-mode pack would
-  # double-nest LXD — and snapd can't load its apparmor profile two levels
-  # deep. Build destructively in the (already isolated) runner instead. The
-  # runner runs without a login session, so point XDG_RUNTIME_DIR at a writable
-  # dir or sdkcraft's state step fails trying to mkdir /run/user/<uid>.
-  publish-arm64:
-    runs-on: [self-hosted, arm64]
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Prepare runtime dir
-        run: |
-          mkdir -p "$RUNNER_TEMP/xdg" && chmod 700 "$RUNNER_TEMP/xdg"
-          echo "XDG_RUNTIME_DIR=$RUNNER_TEMP/xdg" >> "$GITHUB_ENV"
-
-      - name: Define track name
-        run: |
-          TRACK="${INPUT_BRANCH:-${GITHUB_REF#refs/heads/}}"
-          echo "TRACK=$TRACK" >> "$GITHUB_ENV"
-        env:
-          INPUT_BRANCH: ${{ inputs.branch }}
-
-      - name: Pack SDK for arm64
-        run: sdkcraft --verbose pack --destructive-mode --build-for arm64
-
-      - name: Upload arm64 SDK
+      - name: Upload ${{ matrix.arch }} SDK
         env:
           SDKCRAFT_STORE_CREDENTIALS: ${{ secrets.SDKCRAFT_STORE_CREDENTIALS }}
         run: |
