@@ -1,0 +1,35 @@
+summary: check-health fails explicitly when no model is configured
+
+# The default mem0 config ships with empty model names, so a fresh launch must
+# report an SDK health error (naming the missing config) rather than a silent
+# "okay". Setting the models and refreshing must clear that error.
+
+prepare: |
+  envsubst '${BASE}' <workshop.yaml.in >workshop.yaml
+  workshop launch
+
+restore: |
+  workshop remove || true
+
+execute: |
+  # No model set -> health error mentioning the missing model config.
+  workshop info test-mem0 | MATCH "model"
+
+  # Configure the LLM + embedder (model names + embedder dims) and refresh.
+  workshop exec test-mem0 -- python3 - <<'PY'
+  import json, os
+  p = os.path.expanduser("~/.mem0/mem0_config.json")
+  c = json.load(open(p))
+  c["llm"]["config"]["model"] = "qwen3.6:35b"
+  c["embedder"]["config"]["model"] = "nomic-embed-text"
+  c["embedder"]["config"]["embedding_model_dims"] = 768
+  json.dump(c, open(p, "w"))
+  PY
+  workshop refresh
+
+  # The "model not set" error must be gone now.
+  workshop info test-mem0 | NOMATCH "model.*not set"
+
+debug: |
+  workshop tasks
+  workshop info test-mem0 || true
