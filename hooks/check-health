@@ -14,7 +14,7 @@ fi
 #    key, or an ollama embedder with no embedding_model_dims.
 problem="$(sudo -u workshop --login python "$SDK/mem0_healthcheck.py" 2>/dev/null)"
 if [ -n "$problem" ]; then
-    workshopctl set-health error "mem0 not usable: ${problem}. Edit ~/.mem0/mem0_config.json (and ~/.mem0/.env), then run: workshop refresh"
+    workshopctl set-health waiting "mem0 not usable: ${problem}. Edit ~/.mem0/mem0_config.json (and ~/.mem0/.env), then run: workshop refresh"
     exit 0
 fi
 
