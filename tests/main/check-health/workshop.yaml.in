@@ -1,0 +1,4 @@
+name: test-mem0
+base: ${BASE}
+sdks:
+  - name: try-mem0
