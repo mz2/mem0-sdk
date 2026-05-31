@@ -38,7 +38,10 @@ if [ ! -f "$MEM0_DIR/.env" ]; then
 # mem0 SDK environment. Edit, then for the REST server:
 #   systemctl --user restart mem0-server
 #
-# Backend credentials (default backend is OpenAI):
+# The default backend is a local Ollama reached over the `llm-endpoint` tunnel
+# (set the model names + embedder dims in ~/.mem0/mem0_config.json). No key is
+# needed for that. To use a cloud backend instead, switch the provider(s) in
+# mem0_config.json and add the matching key here, e.g.:
 # OPENAI_API_KEY=sk-...
 #
 # Set to 1 to run the REST API server (exposed on the mem0-api tunnel, :8000).

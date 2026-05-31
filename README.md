@@ -1,12 +1,23 @@
 # mem0 SDK for Workshop
 
-This SDK provides [mem0](https://github.com/mem0ai/mem0), the memory layer for
-AI agents, inside a workshop in two interchangeable forms that share **one local
-store**: an **in-process library** (`import mem0`) and a **self-hosted REST API
-server** (the upstream mem0 server, run fully embedded and exposed on a tunnel).
-Memory orchestration, the SQLite history database, and the embedded Qdrant
-vector store all run locally under `~/.mem0`, which is persisted on the host
-across workshop updates along with the virtual environment.
+[mem0](https://github.com/mem0ai/mem0), the memory layer for AI agents, inside a
+workshop. Two interchangeable forms share **one local store**:
+
+- **In-process library** — `import mem0` and use `Memory()` directly.
+- **Self-hosted REST API server** — the upstream mem0 server, run fully embedded
+  and exposed on a tunnel for other workshops (e.g. a Hermes agent) to consume.
+
+Notes:
+
+- Runs locally under `~/.mem0` — orchestration, the SQLite history database, and
+  the embedded Qdrant vector store — persisted on the host across workshop
+  updates (along with the virtual environment).
+- Defaults to a local Ollama LLM + embedder over the `llm-endpoint` tunnel; set
+  the model names (and the embedder's `embedding_model_dims`) in
+  `~/.mem0/mem0_config.json`. No model is defaulted — until you set them,
+  `check-health` reports an error so the missing config is explicit.
+- For a cloud backend, switch the provider in `mem0_config.json` and add the key
+  to `~/.mem0/.env`. The REST server is off unless `MEM0_SERVE=1`.
 
 ---
 
@@ -44,17 +55,28 @@ REST server, set `MEM0_SERVE=1` in `~/.mem0/.env` (see below) and connect the
    `~/.mem0/.env`, and installs the REST server systemd unit (started only when
    `MEM0_SERVE=1`).
 
-### Backend credentials
+### Backend configuration
 
-By default mem0 uses an OpenAI LLM + embedder. Add your key to `~/.mem0/.env`:
+The default backend is a **local Ollama** (LLM + embedder) reached over the
+`llm-endpoint` tunnel — no API key. You must set the model names, then
+`workshop refresh`:
+
+- Connect the tunnel: `workshop connect <ws>/mem0:llm-endpoint <ws>/system:llm-endpoint`
+- Edit `~/.mem0/mem0_config.json`:
+  - `llm.config.model` — e.g. `qwen3.6:35b`
+  - `embedder.config.model` — e.g. `nomic-embed-text`
+  - `embedder.config.embedding_model_dims` — the embedder's dimension (e.g. `768`)
+
+Until those are set, `check-health` reports an **error** (it won't silently run
+on a missing/wrong model).
+
+**Cloud backend instead:** switch the `provider` for `llm`/`embedder` in
+`mem0_config.json` and add the key to `~/.mem0/.env`:
 
 ```bash
 workshop shell
 echo 'OPENAI_API_KEY=sk-...' >> ~/.mem0/.env
 ```
-
-To run fully offline, edit `~/.mem0/mem0_config.json` to use a local Ollama for
-the `llm` and `embedder` blocks (and set the embedder's `embedding_model_dims`).
 
 ### In-process library
 
