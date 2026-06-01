@@ -1,12 +1,14 @@
-summary: mem0 config validator flags an unusable config (launch-free)
+summary: mem0 config validator and renderer behave correctly (launch-free)
 
-# The previous launch-based task asserted MATCH/NOMATCH on `workshop info`, but
-# those passed vacuously (the default config reaches okay, so no "model not set"
-# string ever appears). Run the config validator's unit tests directly instead:
-# they confirm it flags a missing model, a cloud provider without an API key,
-# and an ollama embedder without dims, and stays silent on a good config — which
-# is exactly what hooks/check-health keys its health verdict on. Pure stdlib, so
-# it needs neither a launch nor the workshop venv.
+# A full `workshop launch` is not a reliable assertion vehicle here, so we run
+# the config tooling's unit tests directly (pure stdlib; no launch, no venv):
+#   - test_healthcheck.py: the validator flags a missing model, a cloud provider
+#     without an API key, and an ollama embedder without dims, and stays silent
+#     on a good config — what hooks/check-health keys its health verdict on.
+#   - test_render_config.py: mem0_config.json is a deterministic function of
+#     ~/.mem0/.env (models/provider/base_url/dims flow through, unset knobs are
+#     omitted), which is what setup-project renders on every launch/refresh.
 
 execute: |
     python3 ../../test_healthcheck.py
+    python3 ../../test_render_config.py
