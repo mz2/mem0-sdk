@@ -27,9 +27,11 @@ def run(cfg, env_text=None):
     if env_text is not None:
         (mem0 / ".env").write_text(env_text)
     env = dict(os.environ)
-    env["HOME"] = d
     env.pop("OPENAI_API_KEY", None)  # don't let a host key mask the check
-    r = subprocess.run([sys.executable, str(HC)], env=env, capture_output=True, text=True)
+    # Point the validator at the temp config dir explicitly (argv) rather than
+    # via $HOME — a CI spread system has a real ~/.mem0 and expanduser/$HOME
+    # overrides proved unreliable there.
+    r = subprocess.run([sys.executable, str(HC), str(mem0)], env=env, capture_output=True, text=True)
     return r.stdout.strip()
 
 
@@ -72,10 +74,9 @@ def test_cloud_provider_with_key_is_silent():
 
 def test_flags_invalid_config_file():
     d = tempfile.mkdtemp()
-    (pathlib.Path(d, ".mem0")).mkdir()
-    env = dict(os.environ)
-    env["HOME"] = d
-    r = subprocess.run([sys.executable, str(HC)], env=env, capture_output=True, text=True)
+    mem0 = pathlib.Path(d, ".mem0")
+    mem0.mkdir()
+    r = subprocess.run([sys.executable, str(HC), str(mem0)], capture_output=True, text=True)
     assert "mem0_config.json" in r.stdout
 
 

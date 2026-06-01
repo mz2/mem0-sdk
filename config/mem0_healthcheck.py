@@ -12,9 +12,12 @@ import json
 import os
 import sys
 
-home = os.path.expanduser("~")
-cfg_path = os.path.join(home, ".mem0", "mem0_config.json")
-env_path = os.path.join(home, ".mem0", ".env")
+# Config dir: argv[1] if given (used by tests to point at a temp dir without
+# relying on $HOME/expanduser semantics), else ~/.mem0 (the production default
+# used by hooks/check-health, which invokes this with no arguments).
+cfg_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.expanduser("~"), ".mem0")
+cfg_path = os.path.join(cfg_dir, "mem0_config.json")
+env_path = os.path.join(cfg_dir, ".env")
 
 try:
     cfg = json.load(open(cfg_path))
