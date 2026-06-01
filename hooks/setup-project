@@ -1,7 +1,8 @@
 #!/usr/bin/bash
 # Runs as the workshop user after interfaces are connected. Builds the persisted
-# venv (mem0ai + server deps), seeds the default config and .env, installs the
-# REST server systemd unit, and starts it only when MEM0_SERVE is enabled.
+# venv (mem0ai + server deps), seeds ~/.mem0/.env and renders mem0_config.json
+# from it, installs the REST server systemd unit, and starts it only when
+# MEM0_SERVE is enabled.
 set -euo pipefail
 
 VERSION="$(cat "$SDK/VERSION")"
@@ -27,28 +28,55 @@ fi
 # machinery cannot list) into a workshop-owned, readable location for uvicorn.
 install -D -m644 "$SDK/mem0_server.py" "$VENV/../server/mem0_server.py"
 
-# --- Default config (idempotent) ---------------------------------------------
-if [ ! -f "$MEM0_DIR/mem0_config.json" ]; then
-    cp "$SDK/mem0_config.default.json" "$MEM0_DIR/mem0_config.json"
-fi
-
-# --- Secrets / toggles (idempotent) ------------------------------------------
+# --- Declarative environment (idempotent) ------------------------------------
+# ~/.mem0/.env is the single source of truth; mem0_config.json is rendered from
+# it below. Seed it once with documented defaults.
 if [ ! -f "$MEM0_DIR/.env" ]; then
     cat <<'EOF' > "$MEM0_DIR/.env"
-# mem0 SDK environment. Edit, then for the REST server:
-#   systemctl --user restart mem0-server
-#
-# The default backend is a local Ollama reached over the `llm-endpoint` tunnel
-# (set the model names + embedder dims in ~/.mem0/mem0_config.json). No key is
-# needed for that. To use a cloud backend instead, switch the provider(s) in
-# mem0_config.json and add the matching key here, e.g.:
+# mem0 SDK environment: the single source of truth for configuration.
+# mem0_config.json is rendered from these variables on every launch/refresh.
+# After editing, apply with:  workshop refresh
+# (or, for the REST server only:  systemctl --user restart mem0-server)
+
+# --- LLM ---------------------------------------------------------------------
+MEM0_LLM_PROVIDER=ollama
+MEM0_LLM_MODEL=                  # REQUIRED, e.g. qwen3.6:35b
+MEM0_LLM_BASE_URL=http://127.0.0.1:11434
+MEM0_LLM_TEMPERATURE=0.2
+
+# --- Embedder ----------------------------------------------------------------
+MEM0_EMBEDDER_PROVIDER=ollama
+MEM0_EMBEDDER_MODEL=             # REQUIRED, e.g. nomic-embed-text
+MEM0_EMBEDDER_DIMS=              # REQUIRED for ollama, e.g. 768
+MEM0_EMBEDDER_BASE_URL=http://127.0.0.1:11434
+
+# --- Cloud backend -----------------------------------------------------------
+# For a cloud provider, set the provider(s) above (e.g. openai) and add the key:
 # OPENAI_API_KEY=sk-...
-#
-# Set to 1 to run the REST API server (exposed on the mem0-api tunnel, :8000).
-# Leave 0/unset for in-process library use only.
+
+# --- Toggles -----------------------------------------------------------------
+# 1 to run the REST API server (exposed on the mem0-api tunnel, :8000);
+# leave 0/unset for in-process library use only.
 MEM0_SERVE=0
+# 0 to keep a hand-edited mem0_config.json instead of rendering it from here.
+MEM0_CONFIG_RENDER=1
 EOF
     chmod 600 "$MEM0_DIR/.env"
+fi
+
+# --- Render mem0_config.json from the environment ----------------------------
+set +u
+set -a
+# shellcheck disable=SC1091
+. "$MEM0_DIR/.env"
+set +a
+set -u
+if [ "${MEM0_CONFIG_RENDER:-1}" != "0" ]; then
+    # Declarative: regenerate on every run so config tracks ~/.mem0/.env.
+    python3 "$SDK/mem0_render_config.py" "$MEM0_DIR/mem0_config.json"
+elif [ ! -f "$MEM0_DIR/mem0_config.json" ]; then
+    # Hand-managed: seed once, then never overwrite.
+    python3 "$SDK/mem0_render_config.py" "$MEM0_DIR/mem0_config.json"
 fi
 
 # --- REST server systemd user unit -------------------------------------------

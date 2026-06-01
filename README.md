@@ -12,12 +12,14 @@ Notes:
 - Runs locally under `~/.mem0` — orchestration, the SQLite history database, and
   the embedded Qdrant vector store — persisted on the host across workshop
   updates (along with the virtual environment).
-- Defaults to a local Ollama LLM + embedder over the `llm-endpoint` tunnel; set
-  the model names (and the embedder's `embedding_model_dims`) in
-  `~/.mem0/mem0_config.json`. No model is defaulted — until you set them,
-  `check-health` reports an error so the missing config is explicit.
-- For a cloud backend, switch the provider in `mem0_config.json` and add the key
-  to `~/.mem0/.env`. The REST server is off unless `MEM0_SERVE=1`.
+- Configuration is declarative: `~/.mem0/.env` is the single source of truth,
+  and `mem0_config.json` is rendered from it on every launch/refresh. Defaults to
+  a local Ollama LLM + embedder over the `llm-endpoint` tunnel. Set the model
+  names (and the embedder's `embedding_model_dims`) in `~/.mem0/.env`. No model
+  is defaulted, so until you set one `check-health` reports `waiting` and names
+  the missing variable.
+- For a cloud backend, set the provider(s) in `~/.mem0/.env` and add the key
+  there too. The REST server is off unless `MEM0_SERVE=1`.
 
 ---
 
@@ -51,27 +53,36 @@ REST server, set `MEM0_SERVE=1` in `~/.mem0/.env` (see below) and connect the
    with an Ollama SDK/host and edit `~/.mem0/mem0_config.json`.
 2. No specific project layout is needed.
 3. On launch the SDK installs `mem0ai` into a persisted virtual environment,
-   seeds `~/.mem0/mem0_config.json` (embedded Qdrant on-disk + SQLite) and
-   `~/.mem0/.env`, and installs the REST server systemd unit (started only when
-   `MEM0_SERVE=1`).
+   seeds `~/.mem0/.env`, renders `~/.mem0/mem0_config.json` from it (embedded
+   Qdrant on-disk + SQLite), and installs the REST server systemd unit (started
+   only when `MEM0_SERVE=1`).
 
 ### Backend configuration
 
+Configuration is declarative. `~/.mem0/.env` is the single source of truth, and
+`mem0_config.json` is rendered from it on every launch/refresh. Edit `.env`,
+then `workshop refresh`.
+
 The default backend is a **local Ollama** (LLM + embedder) reached over the
-`llm-endpoint` tunnel — no API key. You must set the model names, then
-`workshop refresh`:
+`llm-endpoint` tunnel, with no API key. Set the model names:
 
 - Connect the tunnel: `workshop connect <ws>/mem0:llm-endpoint <ws>/system:llm-endpoint`
-- Edit `~/.mem0/mem0_config.json`:
-  - `llm.config.model` — e.g. `qwen3.6:35b`
-  - `embedder.config.model` — e.g. `nomic-embed-text`
-  - `embedder.config.embedding_model_dims` — the embedder's dimension (e.g. `768`)
+- Edit `~/.mem0/.env`:
+  - `MEM0_LLM_MODEL`, e.g. `qwen3.6:35b`
+  - `MEM0_EMBEDDER_MODEL`, e.g. `nomic-embed-text`
+  - `MEM0_EMBEDDER_DIMS`, the embedder's dimension, e.g. `768`
+- `workshop refresh`
 
-Until those are set, `check-health` reports an **error** (it won't silently run
-on a missing/wrong model).
+Until the models are set, `check-health` reports `waiting` and names the missing
+variable. The SDK launches, but is flagged as not yet usable rather than running
+on a missing/wrong model.
 
-**Cloud backend instead:** switch the `provider` for `llm`/`embedder` in
-`mem0_config.json` and add the key to `~/.mem0/.env`:
+To hand-manage `mem0_config.json` instead of rendering it, set
+`MEM0_CONFIG_RENDER=0` in `~/.mem0/.env`. The file is then seeded once and never
+overwritten.
+
+**Cloud backend instead:** set `MEM0_LLM_PROVIDER` / `MEM0_EMBEDDER_PROVIDER`
+(e.g. `openai`) and add the key in `~/.mem0/.env`:
 
 ```bash
 workshop shell
