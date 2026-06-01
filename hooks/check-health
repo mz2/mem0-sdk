@@ -9,12 +9,13 @@ if ! out=$(sudo -u workshop --login python -c "import mem0; print(mem0.__version
     exit 0
 fi
 
-# 2. Config must be usable — fail loudly (error) rather than report healthy
-#    while silently misconfigured: no model set, a cloud provider with no API
-#    key, or an ollama embedder with no embedding_model_dims.
+# 2. The rendered config must be usable: flag (waiting) rather than report
+#    healthy while silently misconfigured: no model set, a cloud provider with
+#    no API key, or an ollama embedder with no embedding_model_dims. mem0_config
+#    is rendered from ~/.mem0/.env, so guidance points there.
 problem="$(sudo -u workshop --login python "$SDK/mem0_healthcheck.py" 2>/dev/null)"
 if [ -n "$problem" ]; then
-    workshopctl set-health waiting "mem0 not usable: ${problem}. Edit ~/.mem0/mem0_config.json (and ~/.mem0/.env), then run: workshop refresh"
+    workshopctl set-health waiting "mem0 not usable: ${problem}. Set the model(s) in ~/.mem0/.env (MEM0_LLM_MODEL, MEM0_EMBEDDER_MODEL, MEM0_EMBEDDER_DIMS), then run: workshop refresh"
     exit 0
 fi
 
