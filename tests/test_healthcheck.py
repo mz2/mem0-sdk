@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
-"""Unit tests for config/mem0_healthcheck.py.
+"""Unit tests for the mem0 config validator (config/mem0_healthcheck.py).
 
 Verifies the explicit-failure behaviour: the validator must flag a mem0 config
 that is not actually usable (no model, a cloud provider with no API key, an
 ollama embedder with no dimensions) and stay silent on a good one.
+
+The validator under test is the co-located copy tests/mem0_healthcheck.py:
+`sdkcraft test` (spread) only syncs the tests/ directory into the test system,
+so config/ is not reachable there. test_copy_matches_shipped() enforces that
+the copy is byte-identical to the shipped config/mem0_healthcheck.py wherever
+the full repo is present (locally / on the build runner); it no-ops inside the
+spread container, where config/ is absent.
 
 Run directly:  python3 tests/test_healthcheck.py
 Or via pytest: python3 -m pytest tests/
@@ -15,7 +22,9 @@ import subprocess
 import sys
 import tempfile
 
-HC = pathlib.Path(__file__).resolve().parent.parent / "config" / "mem0_healthcheck.py"
+HERE = pathlib.Path(__file__).resolve().parent
+HC = HERE / "mem0_healthcheck.py"                       # tested copy (synced)
+SHIPPED = HERE.parent / "config" / "mem0_healthcheck.py"  # source of truth
 
 
 def run(cfg, env_text=None):
@@ -78,6 +87,18 @@ def test_flags_invalid_config_file():
     mem0.mkdir()
     r = subprocess.run([sys.executable, str(HC), str(mem0)], capture_output=True, text=True)
     assert "mem0_config.json" in r.stdout
+
+
+def test_copy_matches_shipped():
+    # Where the full repo is present (locally / build runner), the tested copy
+    # must be byte-identical to the shipped validator. Inside the spread
+    # container only tests/ is synced, so config/ is absent and we skip.
+    if not SHIPPED.exists():
+        return
+    assert HC.read_text() == SHIPPED.read_text(), (
+        "tests/mem0_healthcheck.py has drifted from config/mem0_healthcheck.py — "
+        "re-copy it (cp config/mem0_healthcheck.py tests/mem0_healthcheck.py)"
+    )
 
 
 if __name__ == "__main__":
