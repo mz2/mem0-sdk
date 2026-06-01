@@ -1,0 +1,20 @@
+name: validator-sync
+
+# The spread suite tests tests/mem0_healthcheck.py, which must be a byte copy of
+# the shipped config/mem0_healthcheck.py (sdkcraft test only syncs tests/ into
+# the test system, so the validator cannot be referenced from config/ there).
+# This check runs on the full checkout, where both files exist, and fails the PR
+# if they diverge — the enforcement the in-container test guard cannot provide.
+on:
+  pull_request:
+    branches: [latest, main]
+
+jobs:
+  in-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: tests/ validator copy must match config/
+        run: |
+          diff config/mem0_healthcheck.py tests/mem0_healthcheck.py \
+            || { echo "::error::tests/mem0_healthcheck.py drifted from config/mem0_healthcheck.py — re-copy: cp config/mem0_healthcheck.py tests/mem0_healthcheck.py"; exit 1; }
